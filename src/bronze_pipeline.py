@@ -40,8 +40,8 @@ def process_bronze_data(input_file_path: str) -> bool:
     data["_source_file_folder"] = source_file_folder
     data["_source_file_name"] = source_file_name
     data["_source_file_ingest_date"] = source_file_ingest_date
-    data["_utc_source_file_modified_date"] = source_file_modified_date
-    data["_utc_processed_date"] = processed_date
+    data["_source_file_modified_ts"] = source_file_modified_date
+    data["_processed_ts"] = processed_date
 
     # Exporta os dados
     clean_name = os.path.splitext(source_file_name)[0]
