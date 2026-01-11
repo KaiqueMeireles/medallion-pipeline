@@ -3,7 +3,6 @@ import os
 import pandas as pd
 
 from .utils import export_to_file, read_from_file, extract_ingest_date
-
 def process_bronze_data(input_file_path: str) -> bool:
     """
     Processa os dados da camada bronze lendo de um arquivo CSV
