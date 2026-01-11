@@ -125,7 +125,7 @@ def _clean_monetary_value(value: str | float) -> float | None:
         return None
 
 
-def _clean_quantity(value) -> int:
+def _clean_quantity(value: int | float | str | None) -> int:
     
     if pd.isna(value) or value == "":
         return 0
