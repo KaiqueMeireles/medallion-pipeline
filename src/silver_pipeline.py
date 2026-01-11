@@ -156,6 +156,62 @@ def _clean_quantity(value: int | float | str | None) -> int:
         return 0
 
 
+def _clean_shipment_dates(df: pd.DataFrame) -> pd.DataFrame:
+    """Limpa e converte as colunas de datas de envio e entrega."""
+    df_shipments = df.copy()
+    
+    not_shipped_status = ['label_created']
+    not_delivered_status = not_shipped_status + ['in_transit', 'lost']  
+    
+    # Se o status diz que não enviou, limpamos o timestamp de envio
+    not_shipped = df['delivery_status'].isin(not_shipped_status)
+    df_shipments.loc[not_shipped, ['shipped_ts', 'delivered_ts']] = pd.NA
+    
+    # Se o status diz que não entregou, limpamos o timestamp de entrega
+    not_delivered = df['delivery_status'].isin(not_delivered_status)
+    df_shipments.loc[not_delivered, 'delivered_ts'] = pd.NA
+    
+    # O pd.to_datetime converterá pd.NA em NaT (Not a Time) automaticamente
+    for col in ['shipped_ts', 'delivered_ts']:
+        df_shipments[col] = pd.to_datetime(
+            df_shipments[col],
+            format='mixed',
+            dayfirst=True,
+            errors='coerce',
+            utc=True
+        )
+    
+    return df_shipments
+
+
+def _delivery_date_validation(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Valida se há casos onde delivered_ts é anterior a shipped_ts.
+    Imprime aviso e limpa ambas as datas caso encontre inconsistências.
+    """
+    if 'delivered_ts' not in df.columns or 'shipped_ts' not in df.columns:
+        return df
+    
+    # Remove NaT para não gerar problemas
+    mask_valid = df['delivered_ts'].notna() & df['shipped_ts'].notna()
+    
+    if not mask_valid.any():
+        return df
+    
+    # Verifica se shipped_ts > delivered_ts
+    mask_invalid = mask_valid & (df['shipped_ts'] > df['delivered_ts'])
+    
+    if mask_invalid.any():
+        # Limpa ambas as datas para os casos inválidos
+        df.loc[mask_invalid, ['shipped_ts', 'delivered_ts']] = pd.NaT
+        print(
+            f"Foram encontrados {mask_invalid.sum()} registros "
+            f"com 'delivered_ts' anterior a 'shipped_ts'. "
+            f"As datas foram limpas nesses registros."
+        )
+    return df
+
+
 def _process_customers_table(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df = _drop_empty_ids(df, 'customer_id')
@@ -340,24 +396,10 @@ def _process_shipments_table(df: pd.DataFrame) -> pd.DataFrame:
     df['carrier'] = df['carrier'].apply(_clean_string)
     
     df['shipping_cost'] = df['shipping_cost'].apply(_clean_monetary_value)
-    
-    df['shipped_ts'] = pd.to_datetime(
-        df['shipped_ts'],
-        format='mixed',
-        dayfirst=True,
-        errors='coerce',
-        utc=True
-    )
-    
-    df['delivered_ts'] = pd.to_datetime(
-        df['delivered_ts'],
-        format='mixed',
-        dayfirst=True,
-        errors='coerce',
-        utc=True
-    )
-    
+        
     df['delivery_status'] = df['delivery_status'].apply(_clean_string)
+    
+    df = _clean_shipment_dates(df)
     
     # Ordena por order_id e datas de envio/entrega (mais recentes primeiro)
     df = _sort_rows_by(df, ["order_id", "shipped_ts", "delivered_ts"], ascending=[True, False, False])
@@ -380,6 +422,8 @@ def _process_shipments_table(df: pd.DataFrame) -> pd.DataFrame:
         "_processed_ts"
     ]
     df = df.reindex(columns=column_order)
+    
+    df = _delivery_date_validation(df)
     
     return df
 
