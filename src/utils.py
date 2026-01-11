@@ -149,7 +149,7 @@ def list_files_in_directory(
     files = []
 
     # os.walk desce em todas as pastas automaticamente
-    for root, dirs, filenames in os.walk(directory_path):
+    for root, _, filenames in os.walk(directory_path):
         for filename in filenames:
             # Verifica se termina com .csv
             if filename.lower().endswith(f".{file_type.lower()}"):
