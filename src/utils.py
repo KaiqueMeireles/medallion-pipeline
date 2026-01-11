@@ -5,6 +5,10 @@ import shutil
 import pandas as pd
 
 
+# Configure basic logging
+logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+
+
 def extract_ingest_date(file_path: str) -> str:
     """Extrai a data de ingestão do caminho do arquivo.
 
