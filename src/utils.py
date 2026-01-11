@@ -1,3 +1,4 @@
+import logging
 import os
 import shutil
 
@@ -19,7 +20,7 @@ def extract_ingest_date(file_path: str) -> str:
         if "ingest_date=" in folder_name:
             return folder_name.split("ingest_date=")[-1]
         return "unknown"
-    except Exception:
+    except (AttributeError, IndexError, TypeError):
         return "unknown"
 
 
@@ -35,8 +36,10 @@ def clean_directory(directory_path: str) -> None:
     Possui trava de segurança para impedir deleção de pastas fora do 'output'.
     """
     # Impede que delete outra pasta que não esteja dentro de 'output/'
-    if ("output" not in os.path.abspath(directory_path) and
-            "output" not in directory_path):
+    # Normaliza o caminho e garante que ele esteja dentro de <cwd>/output
+    output_root = os.path.abspath(os.path.join(os.getcwd(), "output"))
+    target_path = os.path.abspath(directory_path)
+    if not (target_path == output_root or target_path.startswith(output_root + os.sep)):
         raise ValueError(
             f"SEGURANÇA: A função clean_directory só pode apagar pastas "
             f"dentro de 'output'. Tentativa de apagar: {directory_path}"
@@ -52,14 +55,14 @@ def clean_directory(directory_path: str) -> None:
         os.makedirs(directory_path, exist_ok=True)
 
     except Exception as e:
-        print(f"Erro ao limpar o diretório {directory_path}. Motivo: {e}")
+        logging.error(f"Erro ao limpar o diretório {directory_path}. Motivo: {e}")
         raise e
 
 
 def read_from_file(file_type: str, file_path: str, **kwargs) -> pd.DataFrame:
     """
     Lê os dados de um arquivo CSV e retorna como um DataFrame.
-    
+
     Args:
         file_type: Tipo do arquivo ('csv')
         file_path: Caminho completo
@@ -116,7 +119,7 @@ def export_to_file(
     _ensure_directory(output_file_dir)
 
     data.to_csv(output_file_path, index=False)
-    
+
     return True
 
 
@@ -134,7 +137,7 @@ def list_files_in_directory(
         Lista com caminhos completos dos arquivos encontrados
     """
     accepted_file_types = ["csv"]
-    
+
     if not os.path.exists(directory_path):
         raise FileNotFoundError(
             f"O diretório {directory_path} não foi encontrado."

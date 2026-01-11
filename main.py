@@ -1,7 +1,15 @@
+import sys
+
 from src.pipeline import run_pipeline
 
 if __name__ == "__main__":
-    if run_pipeline():
-        print("Pipeline executado com sucesso.")
+    try:
+        success = run_pipeline()
+    except Exception as exc:
+        print(f"Erro durante a execução do pipeline: {exc}")
+        sys.exit(1)
     else:
-        print("Falha na execução do pipeline.")
+        if success:
+            print("Pipeline executado com sucesso.")
+        else:
+            print("Falha na execução do pipeline.")
