@@ -1,7 +1,10 @@
 import time
 
-from .bronze_pipeline import process_bronze_data
-from .utils import clean_directory, list_files_in_directory
+# from src.gold_pipeline import process_gold_data
+
+from src.bronze_pipeline import process_bronze_data
+from src.silver_pipeline import process_silver_data
+from src.utils import clean_directory, list_files_in_directory
 
 
 def run_pipeline() -> bool:
@@ -9,18 +12,20 @@ def run_pipeline() -> bool:
     clean_directory("output/")
     # Aguarda 2 segundos para garantir que o sistema de arquivos
     # tenha finalizado a limpeza do diretório antes de processar novos dados
-    time.sleep(2)
-    files = list_files_in_directory("input/")
-
-    # A camada bronze processa cada arquivo individualmente, por isso
-    # `process_bronze_data` recebe o caminho do arquivo como parâmetro.
-    for file in files:
+    time.sleep(3)
+    
+    raw_files = list_files_in_directory("input/")
+    for file in raw_files:
         process_bronze_data(file)
 
-    # As camadas silver e gold operam sobre os dados já processados na camada
-    # bronze e, por isso, não precisam de um caminho de arquivo como parâmetro.
-    # Para habilitá-las, descomente as linhas abaixo:
-    # process_silver_data()
-    # process_gold_data()
+    time.sleep(3)
+
+    bronze_files = list_files_in_directory("output/bronze/")
+    for file in bronze_files:
+        process_silver_data(file)
+    
+    # silver_files = list_files_in_directory("output/silver/")
+    # for file in silver_files:
+        # process_gold_data(file)
 
     return True
