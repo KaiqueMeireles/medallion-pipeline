@@ -1,10 +1,10 @@
 import time
 
-# from src.gold_pipeline import process_gold_data
+# from .gold_pipeline import process_gold_data
 
-from src.bronze_pipeline import process_bronze_data
-from src.silver_pipeline import process_silver_data
-from src.utils import clean_directory, list_files_in_directory
+from .bronze_pipeline import process_bronze_data
+from .silver_pipeline import process_silver_data
+from .utils import clean_directory, list_files_in_directory
 
 
 def run_pipeline() -> bool:
