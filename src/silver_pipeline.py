@@ -126,7 +126,15 @@ def _clean_monetary_value(value: str | float) -> float | None:
 
 
 def _clean_quantity(value: int | float | str | None) -> int:
-    
+    """
+    Normaliza valores de quantidade para um inteiro.
+
+    Regras:
+    - Valores nulos ou vazios: retorna 0.
+    - Strings numéricas (incluindo com ponto decimal): convertidas para int.
+    - Palavras em inglês específicas: "one", "two", "three", "four" → 1, 2, 3, 4.
+    - Outros valores inválidos ou não conversíveis: retornam 0.
+    """
     if pd.isna(value) or value == "":
         return 0
     val_str = str(value).strip().lower()
