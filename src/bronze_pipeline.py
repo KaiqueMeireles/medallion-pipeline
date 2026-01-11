@@ -16,28 +16,34 @@ def process_bronze_data(input_file_path: str) -> bool:
         True se a exportação for bem-sucedida, False caso contrário.
     """
     layer = "bronze"
-    data = read_from_file("csv", input_file_path)
-    file_name = os.path.basename(input_file_path)
-    ingest_date = extract_ingest_date(input_file_path)
+    data = read_from_file("csv", input_file_path, dtype=str)
 
-    # Adiciona metadados
-    data["_source_file_folder"] = os.path.normpath(
+    # Monta os metadados
+    source_file_folder = os.path.normpath(
         os.path.dirname(input_file_path)
+    ).replace("\\", "/")
+    source_file_name = os.path.basename(input_file_path)
+    source_file_ingest_date = extract_ingest_date(input_file_path)
+    source_file_modified_date = pd.to_datetime(
+        os.path.getmtime(input_file_path), unit="s", utc=True
     )
-    data["_source_file_name"] = file_name
-    data["_source_file_ingest_date"] = ingest_date
-    data["_source_file_modified_date"] = pd.to_datetime(
-        os.path.getmtime(input_file_path), unit="s"
-    )
-    data["_processed_date"] = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
+    processed_date = pd.Timestamp.now(tz="UTC").strftime("%Y-%m-%d %H:%M:%S")
 
     # Monta o caminho com partição
-    if ingest_date != "unknown":
-        partition_folder = f"ingest_date={ingest_date}"
+    if source_file_ingest_date != "unknown":
+        partition_folder = f"ingest_date={source_file_ingest_date}"
     else:
         partition_folder = "ingest_date=unknown"
 
-    clean_name = file_name.replace(".csv", "")
+    # Adiciona metadados ao DataFrame
+    data["_source_file_folder"] = source_file_folder
+    data["_source_file_name"] = source_file_name
+    data["_source_file_ingest_date"] = source_file_ingest_date
+    data["_utc_source_file_modified_date"] = source_file_modified_date
+    data["_utc_processed_date"] = processed_date
+
+    # Exporta os dados
+    clean_name = source_file_name.replace(".csv", "")
     file_output = f"{partition_folder}/{clean_name}_bronze.csv"
     success = export_to_file(file_output, data, layer)
 

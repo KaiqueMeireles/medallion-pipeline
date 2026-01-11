@@ -56,8 +56,15 @@ def clean_directory(directory_path: str) -> None:
         raise e
 
 
-def read_from_file(file_type: str, file_path: str) -> pd.DataFrame:
-    """Lê os dados de um arquivo CSV e retorna como um DataFrame."""
+def read_from_file(file_type: str, file_path: str, **kwargs) -> pd.DataFrame:
+    """
+    Lê os dados de um arquivo CSV e retorna como um DataFrame.
+    
+    Args:
+        file_type: Tipo do arquivo ('csv')
+        file_path: Caminho completo
+        **kwargs: Argumentos extras para o pandas (ex: dtype=str, sep=';')
+    """
     if file_type.lower() != "csv":
         raise ValueError(
             "Tipo de arquivo ainda não suportado. "
@@ -67,7 +74,7 @@ def read_from_file(file_type: str, file_path: str) -> pd.DataFrame:
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"O arquivo {file_path} não foi encontrado.")
 
-    return pd.read_csv(file_path)
+    return pd.read_csv(file_path, **kwargs)
 
 
 def export_to_file(
