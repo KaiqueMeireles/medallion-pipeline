@@ -249,7 +249,7 @@ def _create_fact_orders(
         )
     df_fact_orders["order_date"] = pd.to_datetime(
         df_fact_orders["order_ts"], errors='coerce', utc=True
-    )
+    ).dt.date
 
     # Definição da ordem exata das colunas na tabela final
     column_order = [
