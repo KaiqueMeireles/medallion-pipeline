@@ -18,16 +18,16 @@ def run_pipeline() -> bool:
     raw_files = list_files_in_directory("input/")
     for file in raw_files:
         process_bronze_data(file)
-
+    print(f"Camada bronze processada.")
     time.sleep(3)
 
     bronze_files = list_files_in_directory("output/bronze/")
     for file in bronze_files:
         process_silver_data(file)
-    
+    print(f"Camada silver processada.")
     time.sleep(3)
     
     silver_files = list_files_in_directory("output/silver/")
     process_gold_data(silver_files)
-
+    print(f"Camada gold processada.")
     return True

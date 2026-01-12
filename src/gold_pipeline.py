@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+
 from .utils import export_to_file
 
 def _load_silver_table(

@@ -1,30 +1,42 @@
 import os
-import pandas as pd
 import unicodedata
-
 from typing import Callable
+
+import pandas as pd
 
 from .utils import export_to_file, read_from_file, extract_ingest_date
 
 
 def _mark_empty_strings(df: pd.DataFrame) -> pd.DataFrame:
-    """Substitui strings vazias por NaN em todo o DataFrame."""
+    # Substitui strings vazias por NaN em todo o DataFrame.
+    # Garante que valores vazios sejam tratados como valores nulos.
     return df.replace("", pd.NA)
 
 
 def _drop_empty_ids(df: pd.DataFrame, id_column: str) -> pd.DataFrame:
-    """Remove linhas onde a coluna de ID está vazia ou nula."""
+    # Remove linhas onde a coluna de ID está vazia ou nula.
+    # IDs vazios indicam registros incompletos que devem ser descartados.
     return df.dropna(subset=[id_column]).copy()
 
 
 def _clean_state_code(state: str) -> str:
-    """Limpa e valida o código do estado (UF)."""
+    """
+    Limpa e valida o código do estado (UF).
+
+    Converte para maiúsculas e valida contra as 27 UFs do Brasil.
+
+    Args:
+        state: Código de estado potencialmente inválido ou mal formatado.
+
+    Returns:
+        Código de estado válido em maiúsculas, ou None se inválido.
+    """
     if pd.isna(state) or state == "":
         return None
-    
+
     state = str(state).strip().upper()
     
-    # Lista oficial das 27 UFs do Brasil
+    # Lista oficial das 27 UFs do Brasil.
     valid_states = {
         'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA',
         'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN',
@@ -38,13 +50,14 @@ def _clean_state_code(state: str) -> str:
 
 
 def _clean_string(value: str) -> str:
-    """Remove espaços extras e converte para minúsculo."""
+    # Remove espaços extras, converte para minúsculo e remove acentos.
+    # Normaliza strings para formato padrão usando decomposição NFD.
     if pd.isna(value) or value == "":
         return None
     
     value = str(value).strip().lower()
     
-    # NFD separa as letras dos acentos ('ã' vira 'a' + '~').
+    # NFD separa letras dos acentos (ex: 'ã' vira 'a' + '~').
     separated_string = unicodedata.normalize('NFD', value)
     
     # Filtra apenas os caracteres que não são marcas de acentuação.
@@ -57,17 +70,24 @@ def _clean_string(value: str) -> str:
 
 def _clean_phone(phone: str) -> str:
     """
-    Remove caracteres não numéricos e retorna apenas os dígitos.
-    Formato de saída: DDD + número (sem parênteses ou traços).
+    Remove caracteres não numéricos e valida formato de telefone.
+
+    Remove código do país (+55), mantém apenas dígitos e valida comprimento
+    (10 ou 11 dígitos para números brasileiros com ou sem 9o dígito).
+
+    Args:
+        phone: Telefone potencialmente com formatação especial ou inválido.
+
+    Returns:
+        Telefone limpo contendo apenas dígitos, ou None se inválido.
     """
     if pd.isna(phone) or phone == "" or str(phone).lower() == "invalid_phone":
         return None
-    
-    # Removendo o código do país, assumindo que são todos do Brasil
+
+    # Remove código do país (assume Brasil).
     phone = str(phone).replace("+55", "")
     
-    # Mantém APENAS números
-    # Ex: "(11) 4002-8922" vira "1140028922"
+    # Mantém apenas dígitos (ex: "(11) 4002-8922" vira "1140028922").
     digits = ''.join(filter(str.isdigit, phone))
     
     if len(digits) < 10 or len(digits) > 11:
@@ -77,11 +97,12 @@ def _clean_phone(phone: str) -> str:
 
 
 def _sort_rows_by(
-    df: pd.DataFrame, 
+    df: pd.DataFrame,
     columns: str | list[str],
     ascending: bool = True
 ) -> pd.DataFrame:
-    """Ordena o DataFrame pelas colunas especificadas."""
+    # Ordena o DataFrame pelas colunas especificadas.
+    # Redefine o índice após ordenação para garantir sequência contínua.
     return df.sort_values(
         by=columns,
         ascending=ascending
@@ -92,18 +113,23 @@ def _drop_duplicate_rows(
     df: pd.DataFrame,
     subset: str | list[str]
 ) -> pd.DataFrame:
-    """Remove linhas duplicadas com base nas colunas especificadas."""
+    # Remove linhas duplicadas com base nas colunas especificadas.
+    # Redefine o índice após remoção para garantir sequência contínua.
     return df.drop_duplicates(subset=subset).reset_index(drop=True)
 
 
 def _clean_monetary_value(value: str | float) -> float | None:
     """
-    Converte valores para float, tratando padrões brasileiros.
+    Converte valores monetários para float tratando padrões brasileiros.
 
-    Regras:
-    - Strings com vírgula: "2.026,00" → 2026.00
-    - Valores negativos: retorna None
-    - Valores vazios ou inválidos: retorna None
+    Detecta padrão brasileiro (ponto para milhares, vírgula para decimais)
+    e valida que valores sejam não-negativos.
+
+    Args:
+        value: Valor monetário como string ou float potencialmente inválido.
+
+    Returns:
+        Valor convertido para float com 2 decimais, ou None se inválido/negativo.
     """
     if pd.isna(value):
         return None
@@ -111,7 +137,7 @@ def _clean_monetary_value(value: str | float) -> float | None:
     try:
         if isinstance(value, str):
             val_str = value.strip()
-            # Trata separador de milhares e decimais: "2.026,00" -> "2026.00"
+            # Converte formato brasileiro (2.026,00 -> 2026.00).
             if ',' in val_str and '.' in val_str:
                 val_str = val_str.replace('.', '')
             val_str = val_str.replace(',', '.')
@@ -127,13 +153,16 @@ def _clean_monetary_value(value: str | float) -> float | None:
 
 def _clean_quantity(value: int | float | str | None) -> int:
     """
-    Normaliza valores de quantidade para um inteiro.
+    Normaliza valores de quantidade para inteiro.
 
-    Regras:
-    - Valores nulos ou vazios: retorna 0.
-    - Strings numéricas (incluindo com ponto decimal): convertidas para int.
-    - Palavras em inglês específicas: "one", "two", "three", "four" → 1, 2, 3, 4.
-    - Outros valores inválidos ou não conversíveis: retornam 0.
+    Converte strings numéricas (com ou sem decimais), palavras em inglês
+    ("one", "two", "three", "four") e valores nulos para inteiros válidos.
+
+    Args:
+        value: Valor de quantidade potencialmente em diversos formatos.
+
+    Returns:
+        Inteiro válido (0 se nulo/vazio ou não conversível).
     """
     if pd.isna(value) or value == "":
         return 0
@@ -157,21 +186,32 @@ def _clean_quantity(value: int | float | str | None) -> int:
 
 
 def _clean_shipment_dates(df: pd.DataFrame) -> pd.DataFrame:
-    """Limpa e converte as colunas de datas de envio e entrega."""
+    """
+    Limpa e converte colunas de datas de envio e entrega.
+
+    Define colunas como NaT quando status indica que evento não ocorreu
+    (não enviado, em trânsito, perdido, não entregue) e converte para datetime.
+
+    Args:
+        df: DataFrame com colunas de timestamps e status de entrega.
+
+    Returns:
+        DataFrame com timestamps de envio/entrega convertidos para datetime.
+    """
     df_shipments = df.copy()
     
     not_shipped_status = ['label_created']
     not_delivered_status = not_shipped_status + ['in_transit', 'lost']  
     
-    # Se o status diz que não enviou, limpamos o timestamp de envio
-    not_shipped = df['delivery_status'].isin(not_shipped_status)
+    # Se status indica que não enviou, limpa timestamp de envio.
+    not_shipped = df_shipments['delivery_status'].isin(not_shipped_status)
     df_shipments.loc[not_shipped, ['shipped_ts', 'delivered_ts']] = pd.NA
     
-    # Se o status diz que não entregou, limpamos o timestamp de entrega
-    not_delivered = df['delivery_status'].isin(not_delivered_status)
+    # Se status indica que não entregou, limpa timestamp de entrega.
+    not_delivered = df_shipments['delivery_status'].isin(not_delivered_status)
     df_shipments.loc[not_delivered, 'delivered_ts'] = pd.NA
     
-    # O pd.to_datetime converterá pd.NA em NaT (Not a Time) automaticamente
+    # pd.to_datetime converte pd.NA em NaT automaticamente.
     for col in ['shipped_ts', 'delivered_ts']:
         df_shipments[col] = pd.to_datetime(
             df_shipments[col],
@@ -186,23 +226,32 @@ def _clean_shipment_dates(df: pd.DataFrame) -> pd.DataFrame:
 
 def _delivery_date_validation(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Valida se há casos onde delivered_ts é anterior a shipped_ts.
-    Imprime aviso e limpa ambas as datas caso encontre inconsistências.
+    Valida consistência de datas de envio e entrega.
+
+    Remove datas inválidas quando delivered_ts é anterior a shipped_ts,
+    indicando inconsistência nos dados. Imprime aviso quando encontra problemas.
+
+    Args:
+        df: DataFrame com colunas de timestamps de envio e entrega.
+
+    Returns:
+        DataFrame com datas inconsistentes limpas para NaT.
     """
-    if 'delivered_ts' not in df.columns or 'shipped_ts' not in df.columns:
+    if ('delivered_ts' not in df.columns or
+            'shipped_ts' not in df.columns):
         return df
     
-    # Remove NaT para não gerar problemas
+    # Remove NaT para evitar problemas na comparação.
     mask_valid = df['delivered_ts'].notna() & df['shipped_ts'].notna()
     
     if not mask_valid.any():
         return df
     
-    # Verifica se shipped_ts > delivered_ts
+    # Verifica se shipped_ts > delivered_ts.
     mask_invalid = mask_valid & (df['shipped_ts'] > df['delivered_ts'])
     
     if mask_invalid.any():
-        # Limpa ambas as datas para os casos inválidos
+        # Limpa ambas as datas para casos inválidos.
         df.loc[mask_invalid, ['shipped_ts', 'delivered_ts']] = pd.NaT
         print(
             f"Foram encontrados {mask_invalid.sum()} registros "
@@ -213,6 +262,18 @@ def _delivery_date_validation(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _process_customers_table(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Processa tabela de clientes da camada silver.
+
+    Remove IDs vazios, limpa códigos de estado e cidades, converte datas,
+    limpa telefones e remove duplicatas mantendo registro mais recente.
+
+    Args:
+        df: DataFrame bruto de clientes da camada bronze.
+
+    Returns:
+        DataFrame processado com clientes únicos ordenados e estruturados.
+    """
     df = df.copy()
     df = _drop_empty_ids(df, 'customer_id')
     
@@ -259,6 +320,18 @@ def _process_customers_table(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _process_order_items_table(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Processa tabela de itens de pedido da camada silver.
+
+    Remove IDs vazios, limpa quantidades e valores monetários, remove
+    duplicatas mantendo primeira ocorrência de cada order_id + product_id.
+
+    Args:
+        df: DataFrame bruto de itens de pedido da camada bronze.
+
+    Returns:
+        DataFrame processado com itens únicos ordenados e estruturados.
+    """
     df = df.copy()
     df = _drop_empty_ids(df, 'order_id')
     df = _drop_empty_ids(df, 'product_id')
@@ -295,6 +368,18 @@ def _process_order_items_table(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _process_orders_table(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Processa tabela de pedidos da camada silver.
+
+    Remove IDs vazios, limpa strings e valores monetários, converte datas,
+    remove duplicatas mantendo primeiro registro de cada order_id.
+
+    Args:
+        df: DataFrame bruto de pedidos da camada bronze.
+
+    Returns:
+        DataFrame processado com pedidos únicos ordenados e estruturados.
+    """
     df = df.copy()
     df = _drop_empty_ids(df, 'order_id')
     df = _drop_empty_ids(df, 'customer_id')
@@ -349,6 +434,18 @@ def _process_orders_table(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _process_products_table(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Processa tabela de produtos da camada silver.
+
+    Remove IDs vazios, limpa strings de categoria e marca, converte datas,
+    remove duplicatas mantendo registro mais recente de cada product_id.
+
+    Args:
+        df: DataFrame bruto de produtos da camada bronze.
+
+    Returns:
+        DataFrame processado com produtos únicos ordenados e estruturados.
+    """
     df = df.copy()
     df = _drop_empty_ids(df, 'product_id')
     
@@ -390,6 +487,18 @@ def _process_products_table(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _process_shipments_table(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Processa tabela de envios (shipments) da camada silver.
+
+    Remove IDs vazios, limpa colunas de status e datas, valida consistência
+    entre datas de envio e entrega, e remove duplicatas.
+
+    Args:
+        df: DataFrame bruto de envios da camada bronze.
+
+    Returns:
+        DataFrame processado com envios únicos com timestamps validados.
+    """
     df = df.copy()
     df = _drop_empty_ids(df, 'order_id')
     
@@ -429,6 +538,21 @@ def _process_shipments_table(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _address_processing_function(file_name: str) -> Callable:
+    """
+    Retorna função de processamento apropriada baseada no nome do arquivo.
+
+    Detecta tipo de tabela a partir do nome do arquivo e retorna a função
+    de processamento correspondente (customers, orders, items, etc).
+
+    Args:
+        file_name: Nome do arquivo (ex: 'customers_bronze.csv').
+
+    Returns:
+        Função de processamento apropriada para o tipo de tabela.
+
+    Raises:
+        ValueError: Se tipo de arquivo não for reconhecido.
+    """
     file_name = file_name.lower()
     
     if "order_items" in file_name:
@@ -449,13 +573,20 @@ def _address_processing_function(file_name: str) -> Callable:
 
 def process_silver_data(bronze_file_path: str) -> bool:
     """
-    Função principal para processar os dados da camada silver.
-    
-    1. Lê o arquivo Bronze.
-    2. Identifica qual tabela é pelo nome do arquivo.
-    3. Chama a função de limpeza específica.
-    4. Atualiza metadados.
-    5. Salva na Silver.
+    Processa dados da camada bronze para a camada silver.
+
+    Lê arquivo bronze, identifica tipo de tabela, aplica limpeza específica,
+    atualiza metadados de processamento e salva resultado em silver.
+
+    Args:
+        bronze_file_path: Caminho completo do arquivo bronze a processar.
+
+    Returns:
+        True se arquivo processado e salvo com sucesso.
+
+    Raises:
+        FileNotFoundError: Se arquivo bronze não existir.
+        ValueError: Se tipo de arquivo não for reconhecido.
     """
     layer = "silver"
     
