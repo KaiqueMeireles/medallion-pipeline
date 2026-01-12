@@ -1,23 +1,12 @@
-import logging
 import os
 import shutil
 
 import pandas as pd
 
 
-# Configure basic logging
-logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
-
-
 def extract_ingest_date(file_path: str) -> str:
-    """Extrai a data de ingestão do caminho do arquivo.
-
-    Args:
-        file_path: Caminho completo do arquivo
-
-    Returns:
-        Data no formato YYYY-MM-DD ou 'unknown' se não conseguir extrair
-    """
+    # Extrai a data de ingestão (ingest_date=YYYY-MM-DD) do caminho do arquivo.
+    # Retorna 'unknown' se padrão não for encontrado.
     try:
         folder_name = os.path.basename(os.path.dirname(file_path))
         # Extrai a parte após "ingest_date="
@@ -29,24 +18,34 @@ def extract_ingest_date(file_path: str) -> str:
 
 
 def _ensure_directory(directory_path: str) -> None:
-    """Verifica se o diretório especificado existe e o cria caso não exista."""
+    # Cria diretório se não existir.
+    # Utiliza exist_ok=True para evitar erro se já criado.
     if not os.path.exists(directory_path):
         os.makedirs(directory_path)
 
 
 def clean_directory(directory_path: str) -> None:
-    """Remove todos os arquivos e subpastas de um diretório e o recria vazio.
+    """
+    Remove todos os arquivos e subpastas do diretório.
 
-    Possui trava de segurança para impedir deleção de pastas fora do 'output'.
+    Possui trava de segurança para impedir deleção fora de 'output/'.
+
+    Args:
+        directory_path: Caminho do diretório a limpar.
+
+    Raises:
+        ValueError: Se tentar deletar fora da pasta 'output/'.
+        Exception: Se houver erro durante a deleção.
     """
     # Impede que delete outra pasta que não esteja dentro de 'output/'
     # Normaliza o caminho e garante que ele esteja dentro de <cwd>/output
     output_root = os.path.abspath(os.path.join(os.getcwd(), "output"))
     target_path = os.path.abspath(directory_path)
-    if not (target_path == output_root or target_path.startswith(output_root + os.sep)):
+    if not (target_path == output_root or
+            target_path.startswith(output_root + os.sep)):
         raise ValueError(
-            f"SEGURANÇA: A função clean_directory só pode apagar pastas "
-            f"dentro de 'output'. Tentativa de apagar: {directory_path}"
+            "SEGURANÇA: A função clean_directory só pode apagar pastas "
+            "dentro de 'output'. Tentativa de apagar: " + directory_path
         )
 
     if not os.path.exists(directory_path):
@@ -59,19 +58,13 @@ def clean_directory(directory_path: str) -> None:
         os.makedirs(directory_path, exist_ok=True)
 
     except Exception as e:
-        logging.error(f"Erro ao limpar o diretório {directory_path}. Motivo: {e}")
+        print(f"Erro ao limpar o diretório {directory_path}. Motivo: {e}")
         raise e
 
 
 def read_from_file(file_type: str, file_path: str, **kwargs) -> pd.DataFrame:
-    """
-    Lê os dados de um arquivo CSV e retorna como um DataFrame.
-
-    Args:
-        file_type: Tipo do arquivo ('csv')
-        file_path: Caminho completo
-        **kwargs: Argumentos extras para o pandas (ex: dtype=str, sep=';')
-    """
+    # Lê arquivo CSV e retorna como DataFrame com opções customizáveis.
+    # Valida tipo de arquivo e existência antes de ler.
     if file_type.lower() != "csv":
         raise ValueError(
             "Tipo de arquivo ainda não suportado. "
@@ -90,18 +83,8 @@ def export_to_file(
     layer: str,
     file_type: str = "csv",
 ) -> bool:
-    """
-    Exporta os dados de um DataFrame para um arquivo no formato especificado.
-
-    Args:
-        file_name: Nome do arquivo (ex: 'dados_processados.csv')
-        data: DataFrame com os dados a serem exportados
-        layer: Camada do pipeline ('bronze', 'silver', 'gold')
-        file_type: Tipo do arquivo (atualmente apenas 'csv')
-
-    Returns:
-        True se o arquivo foi exportado com sucesso
-    """
+    # Exporta DataFrame para output/[layer]/[file_name] com validação.
+    # Cria diretório automaticamente se não existir.
     if file_type.lower() != "csv":
         raise ValueError(
             "Tipo de arquivo ainda não suportado. "
@@ -131,15 +114,8 @@ def list_files_in_directory(
     directory_path: str,
     file_type: str = "csv",
 ) -> list:
-    """Lista arquivos recursivamente em todas as subpastas.
-
-    Args:
-        directory_path: Caminho do diretório raiz
-        file_type: Extensão do arquivo (padrão: 'csv')
-
-    Returns:
-        Lista com caminhos completos dos arquivos encontrados
-    """
+    # Lista arquivos recursivamente em todas as subpastas.
+    # Filtra por extensão especificada e retorna caminhos completos.
     accepted_file_types = ["csv"]
 
     if not os.path.exists(directory_path):
@@ -150,7 +126,8 @@ def list_files_in_directory(
     if file_type.lower() not in accepted_file_types:
         raise ValueError(
             "Tipo de arquivo ainda não suportado. "
-            f"Utilize apenas arquivos do tipo {', '.join(accepted_file_types)}."
+            f"Utilize apenas arquivos do tipo "
+            f"{', '.join(accepted_file_types)}."
         )
 
     files = []

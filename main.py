@@ -6,7 +6,8 @@ if __name__ == "__main__":
     try:
         success = run_pipeline()
         if success:
-            print("Pipeline executado com sucesso.")
+            print("Pipeline executada com sucesso.")
+            print("Arquivos disponíveis na pasta 'output/'.")
         else:
             print("Falha na execução do pipeline.")
     except Exception as exc:

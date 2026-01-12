@@ -6,20 +6,12 @@ from .utils import export_to_file, read_from_file, extract_ingest_date
 
 
 def process_bronze_data(input_file_path: str) -> bool:
-    """
-    Processa os dados da camada bronze lendo de um arquivo CSV
-    e exportando para outro arquivo CSV.
-
-    Args:
-        input_file_path: Caminho do arquivo de entrada.
-
-    Returns:
-        True se a exportação for bem-sucedida. Lança uma exceção em caso de falha.
-    """
+    # Lê arquivo CSV, adiciona metadados e exporta com particionamento por ingest_date.
+    # Retorna True se exportação bem-sucedida.
     layer = "bronze"
     data = read_from_file("csv", input_file_path, dtype=str)
 
-    # Monta os metadados
+    # Monta os metadados.
     source_file_folder = os.path.normpath(
         os.path.dirname(input_file_path)
     ).replace("\\", "/")
